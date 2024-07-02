@@ -1,0 +1,187 @@
+
+#include <LiquidCrystal_I2C.h>
+#include <DHT.h>
+#include<Wire.h>
+LiquidCrystal_I2C lcd(0x27,16,2);
+byte so[] = {0xFC, 0x60, 0xDA, 0xF2, 0x66, 0xB6, 0xBE, 0xE0, 0xFE, 0xF6};
+#define DS 12
+#define SH_CP 13
+#define ST_CP 11
+#define Btn1 3
+#define Btn2 2
+#define IN1 4
+#define IN2 5
+#define ENA 6
+#define PIR 1
+#define LED 8
+#define DHTPIN 7
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+int count = 0;
+bool motorOn = false; 
+bool buttonState = false; 
+bool lastButtonState = false;
+
+unsigned long previousMillis = 0;
+const long interval =60000;
+
+bool ledBlinking = false;
+bool motionDetected = false;
+unsigned long ledPreviousMillis = 0;
+const long ledInterval = 500;
+int blinkCount = 0;
+
+void setup() {
+    pinMode(DS, OUTPUT);
+    pinMode(SH_CP, OUTPUT);
+    pinMode(ST_CP, OUTPUT);
+    pinMode(10, OUTPUT);
+    pinMode(9, OUTPUT);
+    pinMode(PIR,INPUT);
+    pinMode(IN1, OUTPUT);
+    pinMode(IN2, OUTPUT);
+    pinMode(ENA, OUTPUT);
+    pinMode(LED,OUTPUT);
+    pinMode(Btn1, INPUT);
+    pinMode(Btn2, INPUT);
+    lcd.begin(16, 2);
+    lcd.init();
+    lcd.backlight();
+    dht.begin();
+    //attachInterrupt(digitalPinToInterrupt(Btn1), buttonPressed, RISING);
+    hienthinhietdovadoam();
+}
+
+void displayNumber(int number) {
+    
+      for (int i = 0; i < 100; i++) {
+        digitalWrite(10, 0); 
+        digitalWrite(ST_CP, LOW);
+        shiftOut(DS, SH_CP, LSBFIRST, so[number%10]^0xFF);
+        digitalWrite(ST_CP, HIGH);
+        digitalWrite(9, 1);
+        delay(1);
+
+        // Display tens digit
+        digitalWrite(9, 0);
+        digitalWrite(ST_CP, LOW);
+        shiftOut(DS, SH_CP, LSBFIRST, so[number/10]^0xFF);
+        digitalWrite(ST_CP, HIGH);
+        digitalWrite(10, 1);
+        delay(1);
+    }
+    
+}
+
+void buttonPressed() {
+      count = (count + 1) % 100; 
+}
+void buttonPressed2(){
+   buttonState = digitalRead(Btn2);  
+    if (buttonState != lastButtonState && buttonState == LOW) {
+        motorOn = !motorOn; 
+    }
+    if (motorOn) {
+        digitalWrite(IN1, LOW);
+        digitalWrite(IN2, HIGH);
+        analogWrite(ENA, 255); 
+    } else {
+        digitalWrite(IN1, LOW);
+        digitalWrite(IN2, LOW);
+        analogWrite(ENA, 0);  
+    }
+    lastButtonState = buttonState; 
+    // LED 7-segment display
+    displayNumber(count);
+    // Increment count if motor is off
+    if (!motorOn) {
+        buttonPressed();
+    }
+}
+void buttonPressed1(){
+   buttonState = digitalRead(Btn1);  
+    if (buttonState != lastButtonState && buttonState == LOW) {
+        motorOn = !motorOn; 
+    }
+    if (motorOn) {
+        digitalWrite(IN1, HIGH);
+        digitalWrite(IN2, LOW);
+        analogWrite(ENA, 128); 
+    } else {
+        digitalWrite(IN1, LOW);
+        digitalWrite(IN2, LOW);
+        analogWrite(ENA, 0);  
+    }
+    lastButtonState = buttonState; 
+}
+
+void LCD(){
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    hienthinhietdovadoam();
+    }
+
+}
+void hienthinhietdovadoam(){
+  
+    float temperature = dht.readTemperature();
+    float humidity = dht.readHumidity();
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Nhiet do: ");
+    lcd.print(temperature);
+    lcd.print(" C");
+
+    lcd.setCursor(0, 1);
+    lcd.print("Do am: ");
+    lcd.print(humidity);
+    lcd.print(" %");
+}
+void LED_PIR(){
+   unsigned long currentMillis = millis();
+    if (digitalRead(PIR) == HIGH && !ledBlinking && !motionDetected) {
+        motionDetected = true;
+        ledBlinking = true;
+        blinkCount = 0;
+        ledPreviousMillis = currentMillis;
+    }
+
+    if (ledBlinking) {
+        if (currentMillis - ledPreviousMillis >= ledInterval) {
+            ledPreviousMillis = currentMillis;
+            digitalWrite(LED, !digitalRead(LED)); // Toggle LED state
+            blinkCount++;
+            if (blinkCount >= 20) { // 10 blinks (each blink is 2 toggles)
+                ledBlinking = false;
+                digitalWrite(LED, LOW); // Ensure LED is off after blinking
+            }
+        }
+    }
+
+    // Reset motionDetected only after PIR stops detecting motion
+    if (digitalRead(PIR) == LOW) {
+        motionDetected = false;
+    }
+
+}
+void loop() {
+    //displayNumber(count); 
+    //=============a-d=================
+    buttonPressed2();
+    //===============b=================
+    LCD();
+    //===============c=================
+    buttonPressed1();
+    //===============e=================
+    LED_PIR();
+    
+
+    
+
+
+
+
+
+    
+}
